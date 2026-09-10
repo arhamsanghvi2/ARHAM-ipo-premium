@@ -9,7 +9,9 @@ export async function GET(request) {
   
   try {
     const watchlist = getWatchlist();
-    const items = watchlist.map(row => ({ name: row.ipo_name, link: row.ipo_link }));
+    const items = watchlist
+      .map(row => ({ name: row.name || row.ipo_name, link: row.link || row.ipo_link }))
+      .filter(item => item.link && item.link !== 'undefined' && item.link.includes('/ipo/'));
     return NextResponse.json({ success: true, watchlist: items });
   } catch (e) {
     return NextResponse.json({ success: false, error: e.message }, { status: 500 });

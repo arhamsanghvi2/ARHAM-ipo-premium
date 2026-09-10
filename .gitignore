@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local data (SQLite DB - not for production)
+/data/
+
+# test scripts
+test_fetch*.js
+test_scrape*.js
+proxy.js

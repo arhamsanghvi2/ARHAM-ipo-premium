@@ -1,4 +1,5 @@
 import "./globals.css";
+import Header from "./Header";
 
 export const metadata = {
   title: "Arham IPO Premium - Live IPO GMP, Subscription & Allotment Status",
@@ -15,24 +16,7 @@ export default function RootLayout({ children }) {
         </div>
 
         {/* Portal Header Navbar */}
-        <header className="portal-header">
-          <div className="portal-nav-container">
-            <a href="/" className="brand-logo">
-              <span>Arham IPO</span>
-              <span className="badge-tag">PREMIUM</span>
-            </a>
-            
-            <nav style={{ flexGrow: 1, display: 'flex', justifyContent: 'flex-end' }}>
-              <ul className="nav-menu">
-                <li><a href="/" className="nav-link active">Home</a></li>
-                <li><a href="/" className="nav-link">Mainline IPOs</a></li>
-                <li><a href="/" className="nav-link">SME IPOs</a></li>
-                <li><a href="/" className="nav-link">GMP Today</a></li>
-                <li><a href="/" className="nav-link">Subscription</a></li>
-              </ul>
-            </nav>
-          </div>
-        </header>
+        <Header />
 
         {/* Main Content Area */}
         <div style={{ flex: 1 }}>

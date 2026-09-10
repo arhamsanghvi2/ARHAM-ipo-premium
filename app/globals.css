@@ -41,6 +41,11 @@
   padding: 0;
 }
 
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-color);
@@ -59,6 +64,15 @@ a:hover {
   text-decoration: underline;
 }
 
+/* Glass panel utility */
+.glass-panel {
+  background: var(--surface-color);
+  border: 1px solid var(--surface-border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: var(--card-shadow);
+}
+
 /* Containers */
 .container {
   max-width: 1240px;
@@ -72,6 +86,9 @@ a:hover {
   color: var(--header-text);
   border-bottom: 2px solid var(--surface-border);
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+  position: sticky;
+  top: 0;
+  z-index: 50;
 }
 
 .portal-nav-container {
@@ -81,8 +98,7 @@ a:hover {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 1rem;
+  position: relative;
 }
 
 .brand-logo {
@@ -105,6 +121,24 @@ a:hover {
   text-transform: uppercase;
 }
 
+.mobile-menu-toggle {
+  display: none;
+  background: transparent;
+  border: 1px solid var(--surface-border-dark);
+  border-radius: 6px;
+  font-size: 1.25rem;
+  padding: 0.25rem 0.6rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.nav-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  flex-grow: 1;
+}
+
 .nav-menu {
   display: flex;
   gap: 1.25rem;
@@ -117,6 +151,8 @@ a:hover {
   font-size: 0.9rem;
   font-weight: 600;
   transition: color 0.15s ease;
+  padding: 0.35rem 0.5rem;
+  display: block;
 }
 
 .nav-link:hover, .nav-link.active {
@@ -133,13 +169,16 @@ a:hover {
   text-align: center;
   border-bottom: 1px solid #dbeafe;
   font-weight: 500;
+  overflow-x: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Portal Cards */
 .portal-card {
   background: var(--surface-color);
   border: 1px solid var(--surface-border);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 1.25rem;
   box-shadow: var(--card-shadow);
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
@@ -307,9 +346,11 @@ a:hover {
 /* Financial Tables */
 .portal-table-wrapper {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--surface-border);
   border-radius: 6px;
   background: var(--surface-color);
+  max-width: 100%;
 }
 
 .portal-table {
@@ -410,4 +451,68 @@ a:hover {
   gap: 1.25rem;
 }
 
+/* Responsive & Foldable Media Queries */
+@media (max-width: 768px) {
+  .mobile-menu-toggle {
+    display: block;
+  }
 
+  .nav-wrapper {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    border-bottom: 2px solid var(--surface-border);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+    z-index: 100;
+  }
+
+  .nav-wrapper.open {
+    display: flex;
+  }
+
+  .nav-menu {
+    flex-direction: column;
+    width: 100%;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .nav-link {
+    padding: 0.6rem 0.8rem;
+    border-radius: 6px;
+  }
+
+  .nav-link:hover {
+    background: var(--bg-secondary);
+  }
+
+  .portal-footer {
+    padding: 1.5rem 1rem;
+  }
+
+  .portal-footer-inner > div {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 1rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .ticker-bar {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.5rem;
+  }
+  
+  .glass-panel, .portal-card {
+    padding: 0.85rem;
+    border-radius: 8px;
+  }
+  
+  .brand-logo {
+    font-size: 1.15rem;
+  }
+}

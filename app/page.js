@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 const GMP_POLL_MS = 5000;    // Poll GMP from fast cache every 5s
-const FULL_POLL_MS = 60000;  // Full detail re-scrape every 60s (on demand)
 
 export default function Dashboard() {
   const router = useRouter();
@@ -70,6 +69,7 @@ export default function Dashboard() {
   const pollGmp = useCallback(async () => {
     if (selectedIpos.length === 0) return;
     for (const ipo of selectedIpos) {
+      if (!ipo.link || ipo.link === 'undefined') continue; // skip invalid items
       try {
         const res = await fetch(`/api/gmp?link=${encodeURIComponent(ipo.link)}`);
         const json = await res.json();
@@ -89,6 +89,7 @@ export default function Dashboard() {
   // ------ FULL DETAIL FETCH (for subscription tables) ------
   useEffect(() => {
     selectedIpos.forEach(ipo => {
+      if (!ipo.link || ipo.link === 'undefined') return; // skip invalid items
       if (!liveData[ipo.link] && !liveData[`${ipo.link}-loading`]) {
         setLiveData(prev => ({ ...prev, [`${ipo.link}-loading`]: true }));
         fetch(`/api/scrape?path=${encodeURIComponent(ipo.link)}`)
@@ -96,9 +97,16 @@ export default function Dashboard() {
           .then(json => {
             if (json.success) {
               setLiveData(prev => ({ ...prev, [ipo.link]: json.data, [`${ipo.link}-loading`]: false }));
-              // Also seed GMP cache from full scrape
               if (json.data.gmp) {
-                setGmpData(prev => ({ ...prev, [ipo.link]: { gmp: json.data.gmp, gmpPct: json.data.gmpPct, priceBand: json.data.priceBand, lotSize: json.data.lotSize, allTiles: json.data.allTiles } }));
+                setGmpData(prev => ({ ...prev, [ipo.link]: {
+                  gmp: json.data.gmp,
+                  gmpPct: json.data.gmpPct,
+                  priceBand: json.data.priceBand,
+                  lotSize: json.data.lotSize,
+                  openDate: json.data.openDate,
+                  closeDate: json.data.closeDate,
+                  allTiles: json.data.allTiles,
+                }}));
               }
             }
           })
@@ -126,7 +134,7 @@ export default function Dashboard() {
   };
 
   const filteredIpos = ipos.filter(ipo =>
-    ipo.name.toLowerCase().includes(searchTerm.toLowerCase())
+    (ipo.name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // ------ TABLE ROWS ------
@@ -136,9 +144,10 @@ export default function Dashboard() {
       render: (d, ipo) => {
         const isLoading = liveData[`${ipo.link}-loading`];
         const data = liveData[ipo.link];
-        if (isLoading && !data) return <Spinner />;
-        const open = data?.openDate;
-        const close = data?.closeDate;
+        const g = gmpData[ipo.link];
+        if (isLoading && !data && !g) return <Spinner />;
+        const open  = data?.openDate  || g?.openDate;
+        const close = data?.closeDate || g?.closeDate;
         if (!open && !close) return <span style={{ color: '#94a3b8' }}>—</span>;
         return (
           <div style={{ fontSize: '0.75rem', color: '#334155', fontWeight: '500', display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center' }}>
@@ -155,7 +164,7 @@ export default function Dashboard() {
         const isLoading = !g;
         if (isLoading) return <Spinner />;
         return g.gmp && g.gmp !== 'N/A'
-          ? <><span style={{ color: '#16a34a', fontWeight: '800', fontSize: '1.15rem' }}>{g.gmp}</span>{g.gmpPct && <span style={{ display: 'block', fontSize: '0.72rem', color: '#15803d', fontWeight: '600' }}>{g.gmpPct}</span>}</>
+          ? <><span style={{ color: '#16a34a', fontWeight: '800', fontSize: '1.1rem' }}>{g.gmp}</span>{g.gmpPct && <span style={{ display: 'block', fontSize: '0.7rem', color: '#15803d', fontWeight: '600' }}>{g.gmpPct}</span>}</>
           : <span style={{ color: '#94a3b8' }}>—</span>;
       }
     },
@@ -164,7 +173,7 @@ export default function Dashboard() {
       render: (_, ipo) => {
         const g = gmpData[ipo.link];
         return g?.priceBand && g.priceBand !== 'N/A'
-          ? <span style={{ fontWeight: '700', color: '#1d4ed8' }}>{g.priceBand}</span>
+          ? <span style={{ fontWeight: '700', color: '#1d4ed8', fontSize: '0.85rem' }}>{g.priceBand}</span>
           : <span style={{ color: '#94a3b8' }}>—</span>;
       }
     },
@@ -173,7 +182,7 @@ export default function Dashboard() {
       render: (_, ipo) => {
         const g = gmpData[ipo.link];
         return g?.lotSize && g.lotSize !== 'N/A'
-          ? <span style={{ fontWeight: '600', color: '#0f172a' }}>{g.lotSize}</span>
+          ? <span style={{ fontWeight: '600', color: '#0f172a', fontSize: '0.85rem' }}>{g.lotSize}</span>
           : <span style={{ color: '#94a3b8' }}>—</span>;
       }
     },
@@ -183,7 +192,7 @@ export default function Dashboard() {
         const g = gmpData[ipo.link];
         const sub = g?.allTiles?.['Subscribed'];
         return sub
-          ? <><span style={{ color: '#d97706', fontWeight: '800', fontSize: '1.1rem' }}>{sub.val}</span>{sub.sub && <span style={{ display: 'block', fontSize: '0.72rem', color: '#b45309', fontWeight: '600' }}>{sub.sub}</span>}</>
+          ? <><span style={{ color: '#d97706', fontWeight: '800', fontSize: '1.05rem' }}>{sub.val}</span>{sub.sub && <span style={{ display: 'block', fontSize: '0.7rem', color: '#b45309', fontWeight: '600' }}>{sub.sub}</span>}</>
           : <span style={{ color: '#94a3b8' }}>—</span>;
       }
     },
@@ -193,18 +202,18 @@ export default function Dashboard() {
         const isLoading = liveData[`${ipo.link}-loading`];
         const data = liveData[ipo.link];
         if (isLoading) return <Spinner />;
-        if (!data?.tables?.length || !data.tables[0]?.rows?.length) return <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>No data</span>;
+        if (!data?.tables?.length || !data.tables[0]?.rows?.length) return <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>No data</span>;
         const t = data.tables[0];
         return (
-          <div style={{ fontSize: '0.72rem', overflowX: 'auto', width: '100%', maxWidth: '100%', WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ fontSize: '0.7rem', overflowX: 'auto', width: '100%', maxWidth: '100%', WebkitOverflowScrolling: 'touch' }}>
             <table style={{ borderCollapse: 'collapse', width: 'max-content', margin: '0 auto' }}>
               <thead>
-                <tr>{t.rows[0].map((h, i) => <th key={i} style={{ padding: '3px 6px', color: '#64748b', textAlign: i === 0 ? 'left' : 'right', whiteSpace: 'nowrap' }}>{h}</th>)}</tr>
+                <tr>{t.rows[0].map((h, i) => <th key={i} style={{ padding: '2px 4px', color: '#64748b', textAlign: i === 0 ? 'left' : 'right', whiteSpace: 'nowrap' }}>{h}</th>)}</tr>
               </thead>
               <tbody>
                 {t.rows.slice(1, 5).map((r, ri) => (
                   <tr key={ri} style={{ borderTop: '1px solid #e2e8f0' }}>
-                    {r.map((c, ci) => <td key={ci} style={{ padding: '3px 6px', textAlign: ci === 0 ? 'left' : 'right', color: ci === r.length - 1 ? '#d97706' : 'var(--text-primary)', fontWeight: ci === 0 ? '600' : 'normal', whiteSpace: 'nowrap' }}>{c}</td>)}
+                    {r.map((c, ci) => <td key={ci} style={{ padding: '2px 4px', textAlign: ci === 0 ? 'left' : 'right', color: ci === r.length - 1 ? '#d97706' : 'var(--text-primary)', fontWeight: ci === 0 ? '600' : 'normal', whiteSpace: 'nowrap' }}>{c}</td>)}
                   </tr>
                 ))}
               </tbody>
@@ -218,7 +227,7 @@ export default function Dashboard() {
       render: (_, ipo) => (
         <Link
           href={`/ipo?path=${encodeURIComponent(ipo.link)}`}
-          style={{ display: 'inline-block', padding: '0.4rem 1rem', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', color: '#2563eb', fontWeight: '600', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+          style={{ display: 'inline-block', padding: '0.35rem 0.75rem', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', color: '#2563eb', fontWeight: '600', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
         >
           Full Details ↗
         </Link>
@@ -227,52 +236,52 @@ export default function Dashboard() {
   ];
 
   return (
-    <main style={{ padding: '1.5rem 2rem', fontFamily: 'var(--font-sans)', minHeight: '100vh' }}>
+    <main style={{ padding: '1rem', fontFamily: 'var(--font-sans)', minHeight: '100vh', maxWidth: '1240px', margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.15rem' }}>
+          <h1 style={{ fontSize: 'clamp(1.25rem, 4vw, 1.75rem)', fontWeight: '800', color: '#0f172a', marginBottom: '0.15rem' }}>
             📈 IPO Premium Dashboard
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
             GMP auto-updates every 5s · Watchlist saved to database
           </p>
         </div>
-        <button onClick={logout} style={{ padding: '0.5rem 1rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#dc2626', cursor: 'pointer', fontWeight: '600', fontSize: '0.82rem', fontFamily: 'inherit' }}>
+        <button onClick={logout} style={{ padding: '0.45rem 0.9rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#dc2626', cursor: 'pointer', fontWeight: '600', fontSize: '0.8rem', fontFamily: 'inherit', marginLeft: 'auto' }}>
           Sign Out
         </button>
       </div>
 
-      {/* IPO Selector */}
-      <div className="portal-card" style={{ marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-          <h2 style={{ fontWeight: '700', fontSize: '1rem', margin: 0, flexShrink: 0 }}>IPO Directory</h2>
+      {/* IPO Directory Selector */}
+      <div className="portal-card" style={{ marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.85rem', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+          <h2 style={{ fontWeight: '700', fontSize: '0.95rem', margin: 0 }}>IPO Directory</h2>
           <input
             type="text"
             placeholder="🔍 Search by name..."
             className="input-field"
-            style={{ maxWidth: '280px', padding: '0.5rem 0.9rem', fontSize: '0.88rem' }}
+            style={{ maxWidth: '240px', padding: '0.45rem 0.8rem', fontSize: '0.85rem', flexGrow: 1 }}
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />
           {selectedIpos.length > 0 && (
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>
-              {selectedIpos.length} IPO{selectedIpos.length > 1 ? 's' : ''} selected · saved to database
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', width: '100%', smWidth: 'auto' }}>
+              {selectedIpos.length} selected · saved to database
             </span>
           )}
         </div>
 
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '1.5rem' }}><Spinner /></div>
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '1.25rem' }}><Spinner /></div>
         ) : (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', maxHeight: '200px', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', maxHeight: '180px', overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingRight: '2px' }}>
             {filteredIpos.map((ipo, idx) => {
               const isSelected = selectedIpos.some(i => i.link === ipo.link);
               return (
                 <button key={idx} onClick={() => toggleSelection(ipo)} style={{
-                  padding: '0.35rem 0.8rem',
+                  padding: '0.3rem 0.75rem',
                   borderRadius: '20px',
-                  fontSize: '0.8rem',
+                  fontSize: '0.78rem',
                   fontWeight: '500',
                   cursor: 'pointer',
                   transition: 'all 0.15s',
@@ -280,49 +289,51 @@ export default function Dashboard() {
                   border: isSelected ? '1px solid #2563eb' : '1px solid #cbd5e1',
                   color: isSelected ? '#2563eb' : 'var(--text-primary)',
                   fontFamily: 'inherit',
+                  whiteSpace: 'nowrap',
                 }}>
-                  {isSelected ? '✓ ' : '+ '}{ipo.name}
+                  {isSelected ? '✓ ' : '+ '}{ipo.name || '(unnamed)'}
                 </button>
               );
             })}
-            {filteredIpos.length === 0 && <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>No IPOs found for "{searchTerm}"</p>}
+            {filteredIpos.length === 0 && <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No IPOs found for "{searchTerm}"</p>}
           </div>
         )}
       </div>
 
       {/* Comparison Table */}
       {selectedIpos.length === 0 ? (
-        <div className="portal-card" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📊</div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '1.05rem', marginBottom: '0.5rem' }}>Your watchlist is empty</p>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Search and click any IPO above to add it. Your selection is saved automatically.</p>
+        <div className="portal-card" style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
+          <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📊</div>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', marginBottom: '0.35rem' }}>Your watchlist is empty</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>Search and click any IPO above to add it to your live comparison matrix.</p>
         </div>
       ) : (
-        <div className="portal-card" style={{ overflowX: 'auto', padding: '0', borderRadius: '8px' }}>
+        <div className="portal-card" style={{ padding: 0, overflow: 'hidden', borderRadius: '10px' }}>
           {/* Live indicator */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0.6rem 1.5rem', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 1rem', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#334155' }}>Comparison Matrix</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#16a34a', animation: 'livePulse 1.5s infinite' }}></div>
-              <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: '600' }}>GMP LIVE — updating every 5s</span>
+              <span style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: '600' }}>GMP LIVE — updating every 5s</span>
             </div>
           </div>
 
-          <div style={{ overflowX: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
+            <table style={{ width: '100%', minWidth: `${Math.max(600, selectedIpos.length * 150 + 100)}px`, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <thead>
                 <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
-                  <th style={{ padding: '1rem 0.5rem', textAlign: 'left', fontWeight: '700', color: '#334155', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', width: '100px', borderRight: '1px solid #e2e8f0', position: 'sticky', left: 0, background: '#f1f5f9', zIndex: 1 }}>
+                  <th style={{ padding: '0.75rem 0.5rem', textAlign: 'left', fontWeight: '700', color: '#334155', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em', width: '100px', borderRight: '1px solid #e2e8f0', position: 'sticky', left: 0, background: '#f1f5f9', zIndex: 10 }}>
                     Metric
                   </th>
                   {selectedIpos.map(ipo => (
-                    <th key={ipo.link} style={{ padding: '0.75rem 0.25rem', textAlign: 'center', position: 'relative', borderRight: '1px solid #e2e8f0', overflow: 'hidden' }}>
-                      <div style={{ fontWeight: '700', fontSize: '0.8rem', color: 'var(--text-primary)', lineHeight: '1.2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {ipo.name.replace(/\s*\(.*?\)\s*/g, '').trim()}
+                    <th key={ipo.link} style={{ padding: '0.6rem 0.35rem', textAlign: 'center', position: 'relative', borderRight: '1px solid #e2e8f0', overflow: 'hidden', width: '150px' }}>
+                      <div style={{ fontWeight: '700', fontSize: '0.78rem', color: 'var(--text-primary)', lineHeight: '1.25', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: '12px' }}>
+                        {(ipo.name || '').replace(/\s*\(.*?\)\s*/g, '').trim()}
                       </div>
-                      <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: '400', marginTop: '0.2rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {ipo.name.match(/\(([^)]+)\)/)?.[1] || ''}
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: '400', marginTop: '0.15rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {(ipo.name || '').match(/\(([^)]+)\)/)?.[1] || ''}
                       </div>
-                      <button onClick={() => removeIpo(ipo)} style={{ position: 'absolute', top: '2px', right: '4px', background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.9rem', zIndex: 2 }}>×</button>
+                      <button onClick={() => removeIpo(ipo)} style={{ position: 'absolute', top: '2px', right: '2px', background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.85rem', zIndex: 2, padding: '2px 4px' }} title="Remove">×</button>
                     </th>
                   ))}
                 </tr>
@@ -330,11 +341,11 @@ export default function Dashboard() {
               <tbody>
                 {rows.map((row, rowIdx) => (
                   <tr key={row.key} style={{ borderBottom: '1px solid #e2e8f0', background: rowIdx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                    <td style={{ padding: '0.9rem 0.5rem', fontWeight: '600', color: '#334155', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderRight: '1px solid #e2e8f0', whiteSpace: 'nowrap', position: 'sticky', left: 0, background: rowIdx % 2 === 0 ? '#ffffff' : '#f8fafc', zIndex: 1, overflow: 'hidden' }}>
+                    <td style={{ padding: '0.75rem 0.5rem', fontWeight: '600', color: '#334155', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.03em', borderRight: '1px solid #e2e8f0', whiteSpace: 'nowrap', position: 'sticky', left: 0, background: rowIdx % 2 === 0 ? '#ffffff' : '#f8fafc', zIndex: 10, overflow: 'hidden' }}>
                       {row.label}
                     </td>
                     {selectedIpos.map(ipo => (
-                      <td key={ipo.link} style={{ padding: '0.5rem 0.25rem', textAlign: 'center', borderRight: '1px solid #e2e8f0', verticalAlign: 'middle', overflow: 'hidden' }}>
+                      <td key={ipo.link} style={{ padding: '0.5rem 0.35rem', textAlign: 'center', borderRight: '1px solid #e2e8f0', verticalAlign: 'middle', overflow: 'hidden' }}>
                         {row.render(liveData[ipo.link], ipo)}
                       </td>
                     ))}
@@ -345,7 +356,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-
 
       <style>{`
         @keyframes livePulse {

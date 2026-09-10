@@ -51,24 +51,24 @@ export default function LoginPage() {
         <div style={{ position: 'absolute', bottom: '-150px', left: '-150px', width: '500px', height: '500px', background: 'radial-gradient(circle, rgba(168,85,247,0.12) 0%, transparent 70%)', borderRadius: '50%' }}></div>
       </div>
 
-      <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: '420px' }}>
+      <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: '400px' }}>
         {/* Logo / Brand */}
-        <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>📈</div>
-          <h1 style={{ fontSize: '2rem', fontWeight: '800', background: 'linear-gradient(to right,#60a5fa,#a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '0.25rem' }}>
-            IPO Premium
+        <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
+          <div style={{ fontSize: '2.5rem', marginBottom: '0.25rem' }}>📈</div>
+          <h1 style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)', fontWeight: '800', background: 'linear-gradient(to right,#2563eb,#7c3aed)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '0.2rem' }}>
+            Arham IPO Premium
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Live IPO tracker & Watchlist</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Live IPO tracker & Watchlist</p>
         </div>
 
         {/* Login Card */}
-        <div className="glass-panel" style={{ padding: '2.5rem' }}>
-          <h2 style={{ fontWeight: '700', fontSize: '1.25rem', marginBottom: '0.25rem' }}>Sign in</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '2rem' }}>Enter your credentials to access your dashboard</p>
+        <div className="glass-panel" style={{ padding: 'clamp(1.25rem, 4vw, 2rem)' }}>
+          <h2 style={{ fontWeight: '700', fontSize: '1.15rem', marginBottom: '0.2rem' }}>Sign in</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginBottom: '1.5rem' }}>Enter your credentials to access your dashboard</p>
 
-          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Username
               </label>
               <input
@@ -84,7 +84,7 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Password
               </label>
               <input
@@ -100,7 +100,7 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div style={{ padding: '0.75rem 1rem', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', color: '#f87171', fontSize: '0.85rem' }}>
+              <div style={{ padding: '0.65rem 0.85rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#dc2626', fontSize: '0.82rem' }}>
                 {error}
               </div>
             )}
@@ -111,13 +111,13 @@ export default function LoginPage() {
               disabled={loading}
               style={{
                 width: '100%',
-                padding: '0.85rem',
-                background: loading ? 'rgba(59,130,246,0.4)' : 'linear-gradient(135deg,#3b82f6,#6366f1)',
+                padding: '0.75rem',
+                background: loading ? '#93c5fd' : 'linear-gradient(135deg,#2563eb,#4f46e5)',
                 border: 'none',
-                borderRadius: '10px',
+                borderRadius: '8px',
                 color: 'white',
                 fontWeight: '700',
-                fontSize: '1rem',
+                fontSize: '0.95rem',
                 cursor: loading ? 'not-allowed' : 'pointer',
                 fontFamily: 'inherit',
                 transition: 'all 0.2s',
@@ -125,10 +125,11 @@ export default function LoginPage() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '0.5rem',
+                marginTop: '0.5rem',
               }}
             >
               {loading ? (
-                <><div className="loader" style={{ width: '18px', height: '18px', borderWidth: '2px', borderColor: 'rgba(255,255,255,0.3)', borderTopColor: 'white' }}></div> Signing in…</>
+                <><div className="loader" style={{ width: '16px', height: '16px', borderWidth: '2px', borderColor: 'rgba(255,255,255,0.3)', borderTopColor: 'white' }}></div> Signing in…</>
               ) : 'Sign in →'}
             </button>
           </form>
