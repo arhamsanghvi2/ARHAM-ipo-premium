@@ -1,0 +1,263 @@
+'use client';
+
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+
+const FULL_REFRESH_MS = 10000;  // Full subscription table refresh every 10s
+const GMP_REFRESH_MS = 5000;    // GMP tile refresh every 5s
+
+function IpoDetailsContent() {
+  const searchParams = useSearchParams();
+  const path = searchParams.get('path');
+  
+  const [data, setData] = useState(null);
+  const [gmpInfo, setGmpInfo] = useState(null);  // fast-updating GMP data
+  const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [gmpLastUpdated, setGmpLastUpdated] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [fullCountdown, setFullCountdown] = useState(FULL_REFRESH_MS / 1000);
+  const [gmpCountdown, setGmpCountdown] = useState(GMP_REFRESH_MS / 1000);
+  
+  const fullIntervalRef = useRef(null);
+  const gmpIntervalRef = useRef(null);
+  const fullCountdownRef = useRef(null);
+  const gmpCountdownRef = useRef(null);
+
+  // ------ FULL PAGE DATA FETCH ------
+  const fetchFull = async (isRefresh = false) => {
+    if (!path) return;
+    if (isRefresh) setRefreshing(true);
+    try {
+      const res = await fetch(`/api/scrape?path=${encodeURIComponent(path)}&t=${Date.now()}`);
+      const json = await res.json();
+      if (json.success) {
+        setData(json.data);
+        setLastUpdated(new Date());
+        // Update GMP info from full scrape too
+        if (json.data.gmp) {
+          setGmpInfo({
+            gmp: json.data.gmp,
+            gmpPct: json.data.gmpPct,
+            priceBand: json.data.priceBand,
+            lotSize: json.data.lotSize,
+            allTiles: json.data.allTiles,
+          });
+          setGmpLastUpdated(new Date());
+        }
+      }
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); setRefreshing(false); }
+  };
+
+  // ------ FAST GMP FETCH ------
+  const fetchGmp = async () => {
+    if (!path) return;
+    try {
+      const res = await fetch(`/api/gmp?link=${encodeURIComponent(path)}`);
+      const json = await res.json();
+      if (json.success && json.data) {
+        setGmpInfo(json.data);
+        setGmpLastUpdated(new Date());
+      }
+    } catch { /* silent */ }
+  };
+
+  // Initial load
+  useEffect(() => {
+    fetchFull(false);
+    fetchGmp();
+  }, [path]);
+
+  // Full refresh every 10s
+  useEffect(() => {
+    fullCountdownRef.current = setInterval(() => setFullCountdown(p => p <= 1 ? FULL_REFRESH_MS / 1000 : p - 1), 1000);
+    fullIntervalRef.current = setInterval(() => { fetchFull(true); setFullCountdown(FULL_REFRESH_MS / 1000); }, FULL_REFRESH_MS);
+    return () => { clearInterval(fullCountdownRef.current); clearInterval(fullIntervalRef.current); };
+  }, [path]);
+
+  // GMP refresh every 5s
+  useEffect(() => {
+    gmpCountdownRef.current = setInterval(() => setGmpCountdown(p => p <= 1 ? GMP_REFRESH_MS / 1000 : p - 1), 1000);
+    gmpIntervalRef.current = setInterval(() => { fetchGmp(); setGmpCountdown(GMP_REFRESH_MS / 1000); }, GMP_REFRESH_MS);
+    return () => { clearInterval(gmpCountdownRef.current); clearInterval(gmpIntervalRef.current); };
+  }, [path]);
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '6rem', gap: '1.5rem' }}>
+        <div className="loader" style={{ width: '44px', height: '44px', borderWidth: '4px' }}></div>
+        <p style={{ color: 'var(--text-secondary)' }}>Launching stealth browser & fetching live data…</p>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div style={{ textAlign: 'center', marginTop: '4rem' }}>
+        <p style={{ color: '#ef4444' }}>Failed to load IPO details. Please try again.</p>
+        <Link href="/" style={{ color: '#60a5fa', display: 'inline-block', marginTop: '1rem' }}>← Back to Dashboard</Link>
+      </div>
+    );
+  }
+
+  const gmp = gmpInfo?.gmp || data.gmp || 'N/A';
+  const gmpPct = gmpInfo?.gmpPct || data.gmpPct || '';
+  const priceBand = gmpInfo?.priceBand || data.priceBand || 'N/A';
+  const lotSize = gmpInfo?.lotSize || data.lotSize || 'N/A';
+  const tiles = gmpInfo?.allTiles || data.allTiles || {};
+
+  return (
+    <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+      {/* Top Bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <Link href="/" style={{ padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', color: 'var(--text-primary)', fontWeight: '500', border: '1px solid rgba(255,255,255,0.1)' }}>
+          ← Dashboard
+        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {lastUpdated && <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Tables: <strong style={{ color: '#f8fafc' }}>{lastUpdated.toLocaleTimeString()}</strong></span>}
+          <div style={{ padding: '0.35rem 0.8rem', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', animation: 'livePulse 1.5s infinite' }}></div>
+            <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: '600' }}>Tables refresh in {fullCountdown}s</span>
+          </div>
+          <div style={{ padding: '0.35rem 0.8rem', background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.2)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#a855f7', animation: 'livePulse 1s infinite' }}></div>
+            <span style={{ fontSize: '0.75rem', color: '#c084fc', fontWeight: '600' }}>GMP refresh in {gmpCountdown}s</span>
+          </div>
+          <button onClick={() => { fetchFull(true); fetchGmp(); setFullCountdown(FULL_REFRESH_MS / 1000); setGmpCountdown(GMP_REFRESH_MS / 1000); }}
+            style={{ padding: '0.35rem 0.8rem', background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '8px', color: '#60a5fa', cursor: 'pointer', fontWeight: '600', fontSize: '0.78rem', fontFamily: 'inherit' }}>
+            ↻ Now
+          </button>
+        </div>
+      </div>
+
+      {/* Title */}
+      <div className="glass-panel" style={{ marginBottom: '1.25rem' }}>
+        <h1 style={{ fontSize: '1.7rem', fontWeight: '800', background: 'linear-gradient(to right,#60a5fa,#a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '0.2rem' }}>
+          {data.title}
+        </h1>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+          Live data · Subscription tables refresh every 10s · GMP refreshes every 5s
+        </p>
+      </div>
+
+      {/* Key Metrics */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+        {/* GMP - highlighted with live indicator */}
+        <div className="glass-panel" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: '8px', right: '10px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+            <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', animation: 'livePulse 1s infinite' }}></div>
+            <span style={{ fontSize: '0.6rem', color: '#10b981' }}>LIVE</span>
+          </div>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>GMP Rumors</div>
+          <div style={{ fontSize: '2.4rem', fontWeight: '900', color: gmp !== 'N/A' ? '#10b981' : '#6b7280', lineHeight: 1 }}>{gmp}</div>
+          {gmpPct && <div style={{ fontSize: '0.9rem', color: '#6ee7b7', marginTop: '0.35rem', fontWeight: '600' }}>{gmpPct}</div>}
+          {gmpLastUpdated && <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.25)', marginTop: '0.4rem' }}>{gmpLastUpdated.toLocaleTimeString()}</div>}
+        </div>
+
+        {/* Price Band */}
+        <div className="glass-panel" style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>Price Band</div>
+          <div style={{ fontSize: '1.9rem', fontWeight: '800', color: 'var(--text-primary)' }}>{priceBand}</div>
+          {tiles['Price Band']?.sub && <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{tiles['Price Band'].sub}</div>}
+        </div>
+
+        {/* Lot Size */}
+        <div className="glass-panel" style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>Lot Size</div>
+          <div style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-primary)' }}>{lotSize}</div>
+          {data.lotSizeMin && <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{data.lotSizeMin}</div>}
+        </div>
+
+        {/* Subscribed */}
+        {tiles['Subscribed'] && (
+          <div className="glass-panel" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', textAlign: 'center' }}>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>Subscribed</div>
+            <div style={{ fontSize: '2rem', fontWeight: '800', color: '#f59e0b' }}>{tiles['Subscribed'].val}</div>
+            {tiles['Subscribed'].sub && <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{tiles['Subscribed'].sub}</div>}
+          </div>
+        )}
+
+        {/* Extra tiles */}
+        {Object.entries(tiles)
+          .filter(([k]) => !['GMP Rumors','GMP','Price Band','Lot Size','Subscribed'].includes(k))
+          .map(([label, {val, sub}]) => (
+            <div key={label} className="glass-panel" style={{ background: 'rgba(255,255,255,0.02)', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>{label}</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-primary)' }}>{val || '—'}</div>
+              {sub && <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>{sub}</div>}
+            </div>
+          ))}
+      </div>
+
+      {/* Subscription Tables */}
+      {data.tables && data.tables.filter(t => t.rows?.length > 1).map((table, tIdx) => (
+        <div key={tIdx} className="glass-panel" style={{ marginBottom: '1.25rem', padding: 0, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1.25rem', background: 'rgba(59,130,246,0.08)', borderBottom: '1px solid rgba(59,130,246,0.18)' }}>
+            <h2 style={{ fontWeight: '700', fontSize: '0.95rem', color: '#60a5fa', margin: 0 }}>
+              📊 {table.caption || (tIdx === 0 ? 'Subscription Details' : `Table ${tIdx + 1}`)}
+            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {refreshing && <div className="loader" style={{ width: '14px', height: '14px', borderWidth: '2px' }}></div>}
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>refreshes in {fullCountdown}s</span>
+            </div>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
+                  {table.rows[0].map((th, i) => (
+                    <th key={i} style={{ padding: '0.8rem 1.1rem', textAlign: i === 0 ? 'left' : 'right', fontWeight: '700', fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid rgba(255,255,255,0.06)', whiteSpace: 'nowrap' }}>{th}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {table.rows.slice(1).map((tr, rIdx) => (
+                  <tr key={rIdx}
+                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: rIdx % 2 ? 'rgba(255,255,255,0.012)' : 'transparent', cursor: 'default' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.07)'}
+                    onMouseLeave={e => e.currentTarget.style.background = rIdx % 2 ? 'rgba(255,255,255,0.012)' : 'transparent'}
+                  >
+                    {tr.map((td, cIdx) => (
+                      <td key={cIdx} style={{ padding: '0.8rem 1.1rem', textAlign: cIdx === 0 ? 'left' : 'right', fontSize: '0.88rem', fontWeight: cIdx === 0 ? '600' : '400', color: cIdx === tr.length - 1 ? '#f59e0b' : 'var(--text-primary)' }}>{td}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+
+      {/* Additional Info */}
+      {data.additionalInfo && Object.keys(data.additionalInfo).length > 0 && (
+        <div className="glass-panel">
+          <h2 style={{ fontWeight: '700', fontSize: '0.95rem', color: '#60a5fa', marginBottom: '1rem' }}>📋 Additional Information</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.5rem' }}>
+            {Object.entries(data.additionalInfo).slice(0, 30).map(([key, val]) => (
+              <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.55rem 0.9rem', background: 'rgba(255,255,255,0.025)', borderRadius: '8px', gap: '1rem' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', flexShrink: 0 }}>{key}</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: '600', textAlign: 'right' }}>{val}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes livePulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.4); } }
+      `}</style>
+    </div>
+  );
+}
+
+export default function IpoPage() {
+  return (
+    <main style={{ padding: '1.5rem 2rem', minHeight: '100vh', fontFamily: 'var(--font-sans)' }}>
+      <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', marginTop: '4rem' }}><div className="loader" style={{ width: '36px', height: '36px', borderWidth: '3px' }}></div></div>}>
+        <IpoDetailsContent />
+      </Suspense>
+    </main>
+  );
+}
