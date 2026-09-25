@@ -40,10 +40,12 @@ export async function proxy(request) {
   }
 
   const token = request.cookies.get('ipo_token')?.value;
-  if (!token) return NextResponse.redirect(new URL('/login', request.url));
+  const payload = token ? await verifyJwt(token) : null;
 
-  const payload = await verifyJwt(token);
   if (!payload) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
     const res = NextResponse.redirect(new URL('/login', request.url));
     res.cookies.delete('ipo_token');
     return res;
@@ -51,6 +53,8 @@ export async function proxy(request) {
 
   return NextResponse.next();
 }
+
+export default proxy;
 
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],

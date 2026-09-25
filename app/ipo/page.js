@@ -149,18 +149,51 @@ function IpoDetailsContent() {
             <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#16a34a', animation: 'livePulse 1s infinite' }}></div>
             <span style={{ fontSize: '0.6rem', color: '#16a34a', fontWeight: '700' }}>LIVE</span>
           </div>
-          <div style={{ fontSize: '0.68rem', color: '#166534', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.35rem', fontWeight: '700' }}>GMP Rumors</div>
+          <div style={{ fontSize: '0.68rem', color: '#166534', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.35rem', fontWeight: '700' }}>
+            {gmp.includes('listed') || gmp.startsWith('+') ? 'Listing Gain' : 'GMP Rumors'}
+          </div>
           <div style={{ fontSize: 'clamp(1.6rem, 5vw, 2.2rem)', fontWeight: '900', color: gmp !== 'N/A' ? '#15803d' : '#64748b', lineHeight: 1 }}>{gmp}</div>
           {gmpPct && <div style={{ fontSize: '0.82rem', color: '#166534', marginTop: '0.3rem', fontWeight: '700' }}>{gmpPct}</div>}
           {gmpLastUpdated && <div style={{ fontSize: '0.65rem', color: '#4b5563', marginTop: '0.3rem' }}>{gmpLastUpdated.toLocaleTimeString()}</div>}
         </div>
 
-        {/* Price Band */}
-        <div className="glass-panel" style={{ background: '#eff6ff', border: '1px solid #bfdbfe', textAlign: 'center', padding: '1rem 0.75rem' }}>
-          <div style={{ fontSize: '0.68rem', color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.35rem', fontWeight: '700' }}>Price Band</div>
-          <div style={{ fontSize: 'clamp(1.2rem, 4vw, 1.7rem)', fontWeight: '800', color: '#1e3a8a' }}>{priceBand}</div>
-          {tiles['Price Band']?.sub && <div style={{ fontSize: '0.72rem', color: '#3b82f6', marginTop: '0.2rem' }}>{tiles['Price Band'].sub}</div>}
-        </div>
+        {/* Dates - one line */}
+        {(data.dateRange || data.openDate || data.closeDate) && (
+          <div className="glass-panel" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', textAlign: 'center', padding: '1rem 0.75rem' }}>
+            <div style={{ fontSize: '0.68rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.35rem', fontWeight: '700' }}>IPO Dates</div>
+            <div style={{ fontSize: 'clamp(0.95rem, 3.2vw, 1.25rem)', fontWeight: '800', color: '#1e293b', whiteSpace: 'nowrap' }}>
+              {data.dateRange || (data.openDate && data.closeDate ? `${data.openDate} to ${data.closeDate}` : data.openDate || data.closeDate)}
+            </div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+              {data.listingDate ? `Listing: ${data.listingDate}` : ''}
+            </div>
+          </div>
+        )}
+
+        {/* Price Band / Size */}
+        {(() => {
+          const rawSize = gmpInfo?.issueSize || data.issueSize || tiles['Price Band']?.sub || '';
+          const cleanSize = rawSize.replace(/\s*issue\s*$/i, '').trim();
+          const displayPrice = priceBand !== 'N/A' && cleanSize 
+            ? `${priceBand} / ${cleanSize}` 
+            : (priceBand !== 'N/A' ? priceBand : cleanSize || 'N/A');
+
+          return (
+            <div className="glass-panel" style={{ background: '#eff6ff', border: '1px solid #bfdbfe', textAlign: 'center', padding: '1rem 0.75rem' }}>
+              <div style={{ fontSize: '0.68rem', color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.35rem', fontWeight: '700' }}>
+                Price Band / Issue Size
+              </div>
+              <div style={{ fontSize: 'clamp(1rem, 3.2vw, 1.45rem)', fontWeight: '800', color: '#1e3a8a', whiteSpace: 'nowrap' }}>
+                {displayPrice}
+              </div>
+              {cleanSize && (
+                <div style={{ fontSize: '0.72rem', color: '#3b82f6', marginTop: '0.2rem', fontWeight: '600' }}>
+                  Total Issue: {cleanSize}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Lot Size */}
         <div className="glass-panel" style={{ background: '#faf5ff', border: '1px solid #e9d5ff', textAlign: 'center', padding: '1rem 0.75rem' }}>

@@ -1,8 +1,7 @@
 /**
  * Fast GMP-only endpoint.
  * - In-memory cache (works on Vercel warm instances)
- * - Uses shared browser.js (sparticuz/chromium on Vercel, puppeteer locally)
- * - Background refresh on stale cache (fire-and-forget)
+ * - Uses curl-based browser.js — fast (~200ms vs 30-60s Puppeteer)
  */
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
@@ -23,32 +22,66 @@ async function fetchGmp(ipoLink) {
     const html = await scrapeHtml(url);
     const $ = cheerio.load(html);
 
+    // Site uses .ip-stat / .ip-stat__label / .ip-stat__value (NOT .ipo-tile)
     const tiles = {};
-    $('.ipo-tile').each((i, tile) => {
-      const label = $(tile).find('.ipo-tile__label').clone()
-        .children().remove().end().text().trim().replace(/\s+/g, ' ')
-        || $(tile).find('.ipo-tile__label').text().trim().replace(/\s+/g, ' ');
-      const val = $(tile).find('.ipo-tile__value').text().trim().replace(/\s+/g, ' ');
-      const sub = $(tile).find('.ipo-tile__sub').text().trim().replace(/\s+/g, ' ');
+    $('.ip-stat').each((i, stat) => {
+      const label = $(stat).find('.ip-stat__label').text().trim().replace(/\s+/g, ' ');
+      const val   = $(stat).find('.ip-stat__value').text().trim().replace(/\s+/g, ' ');
+      const sub   = $(stat).find('.ip-stat__sub').text().trim().replace(/\s+/g, ' ');
       if (label) tiles[label] = { val, sub };
     });
 
-    // Dates from timeline
+    // Dates from ip-timeline (NOT ipo-timeline)
     let openDate = '', closeDate = '';
-    $('.ipo-timeline__step').each((i, el) => {
-      const label   = $(el).find('.ipo-timeline__label').text().trim();
-      const dateVal = $(el).find('.ipo-timeline__date').text().trim();
+    $('.ip-timeline__step').each((i, el) => {
+      const label   = $(el).find('.ip-timeline__label').text().trim();
+      const dateVal = $(el).find('.ip-timeline__date').text().trim();
       if (/^open$/i.test(label))  openDate  = dateVal;
       if (/^close$/i.test(label)) closeDate = dateVal;
     });
 
+    // Dynamic GMP and Listing Gain extraction
+    let gmp = 'N/A';
+    let gmpPct = '';
+    
+    for (const [key, t] of Object.entries(tiles)) {
+      const k = key.toLowerCase();
+      if (k.includes('gmp') || k.includes('premium')) {
+        gmp = t.val;
+        gmpPct = t.sub || '';
+        break;
+      }
+    }
+    if (gmp === 'N/A') {
+      for (const [key, t] of Object.entries(tiles)) {
+        const k = key.toLowerCase();
+        if (k.includes('listing gain')) {
+          gmp = t.val;
+          gmpPct = t.sub || '';
+          break;
+        }
+      }
+    }
+
+    let dateRange = '';
+    if (openDate && closeDate) {
+      dateRange = `${openDate} to ${closeDate}`;
+    } else if (openDate) {
+      dateRange = openDate;
+    } else if (closeDate) {
+      dateRange = closeDate;
+    }
+
     const data = {
-      gmp:       tiles['GMP Rumors']?.val || tiles['GMP']?.val || 'N/A',
-      gmpPct:    tiles['GMP Rumors']?.sub || '',
+      gmp,
+      gmpPct,
       priceBand: tiles['Price Band']?.val || 'N/A',
+      issueSize: (tiles['Price Band']?.sub || '').replace(/\s*issue\s*$/i, '').trim(),
       lotSize:   tiles['Lot Size']?.val   || 'N/A',
+      subscribed: tiles['Subscribed']?.val || 'N/A',
       openDate,
       closeDate,
+      dateRange,
       allTiles:  tiles,
     };
 
