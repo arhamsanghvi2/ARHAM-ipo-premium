@@ -25,21 +25,35 @@ export default function Dashboard() {
   };
 
   // ------ LOAD IPO LIST ------
+  // Refetches periodically and never wipes existing data on a failed/empty
+  // response, so a single transient glitch (server restart, network blip)
+  // can't leave the dashboard permanently blank until a manual reload.
   useEffect(() => {
+    let cancelled = false;
+
     async function fetchIpos() {
       try {
         const res = await fetch('/api/scrape?path=/');
         const json = await res.json();
-        if (json.success && json.data.ipos) {
-          setIpos(json.data.ipos);
+        if (!cancelled && json.success && json.data.ipos) {
+          setIpos(prev => (json.data.ipos.length > 0 ? json.data.ipos : prev));
         }
       } catch (e) {
         console.error('Fetch IPOs error:', e);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
+
     fetchIpos();
+    const quickRetry = setTimeout(fetchIpos, 4000); // fast recovery from a first-load hiccup
+    const interval = setInterval(fetchIpos, 60000); // keep list fresh & self-heal going forward
+
+    return () => {
+      cancelled = true;
+      clearTimeout(quickRetry);
+      clearInterval(interval);
+    };
   }, []);
 
   // ------ LOAD SAVED WATCHLIST from DB ------

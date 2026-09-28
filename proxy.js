@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'ipo-premium-secret-key-arham-2026';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required — set it in .env.local (dev) or your host\'s env vars (production).');
+}
 
 // Edge-compatible JWT verify using SubtleCrypto
 async function verifyJwt(token) {
